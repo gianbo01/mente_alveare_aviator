@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Mente Alveare Aviator Demo</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="game-container">
+    <h1>Mente Alveare - Demo Aviator</h1>
+    <p class="subtitle">Il gioco preferito delle nonne sicule</p>
+
+    <div class="play-area">
+        <canvas id="trail-canvas"></canvas>
+
+        <div class="van-container" id="van">
+            <img id="van-img" src="{{ url_for('static', filename='img/fiat_scudo.png') }}" alt="Fiat Scudo nero">
+        </div>
+
+
+        <div class="multiplier">
+            <span id="multiplier-value">1.00x</span>
+        </div>
+
+        <div class="status" id="status-text">
+            Premi "Nuovo round" per iniziare
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="start-btn">Nuovo round</button>
+        <button id="cashout-btn" disabled>Esci (Cashout)</button>
+    </div>
+
+    <div class="scoreboard">
+        <p>Punteggio ultimo cashout: <span id="last-cashout">-</span></p>
+        <p>Punteggio migliore: <span id="best-cashout">-</span></p>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
