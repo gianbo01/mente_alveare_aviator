@@ -15,7 +15,7 @@ Veicoli:
   - gazzella della polizia delle docce
   - topolino dei carabinieri
 
-Brainroot:
+Brainroot alveari:
   - pesce verona
   - giaguaro gianbo
   - cima cimino pinguino
@@ -33,6 +33,7 @@ Special guest:
   - ora parlo io
   - andrea diprè
   - c19 (solo se giocato da tv)
+  - la cavalletta
 
 # TODO
   - gestione delle monete
