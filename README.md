@@ -19,7 +19,7 @@ Brainroot alveari:
   - pesce verona
   - giaguaro gianbo
   - cima cimino pinguino
-  - orso carabiniere viola
+  - orso viola
   - melo suca malla
   - calabria comò komodo di calabria
 
