@@ -13,6 +13,7 @@ Veicoli:
   - macchina della truffa
   - roulotte dei rom
   - gazzella della polizia delle docce
+  - topolino dei carabinieri
 
 Brainroot:
   - pesce verona
