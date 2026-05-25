@@ -27,14 +27,44 @@
         </div>
     </div>
 
+    <div class="wallet-panel">
+        <div class="wallet-stat">
+            <span>Saldo</span>
+            <strong><span id="balance-value">1000.00</span> monete</strong>
+        </div>
+
+        <label class="bet-control" for="bet-input">
+            <span>Puntata</span>
+            <input id="bet-input" type="number" min="1" value="10" step="1">
+        </label>
+
+        <label class="auto-cashout-toggle">
+            <input id="auto-cashout-enabled" type="checkbox">
+            <span>Auto cashout</span>
+        </label>
+
+        <label class="auto-cashout-control" for="auto-cashout-input">
+            <span>Auto cashout a:</span>
+            <input id="auto-cashout-input" type="number" min="1.01" value="2.00" step="0.01">
+        </label>
+    </div>
+
     <div class="controls">
         <button id="start-btn">Nuovo round</button>
         <button id="cashout-btn" disabled>Esci (Cashout)</button>
     </div>
 
     <div class="scoreboard">
+        <p id="auto-cashout-status" class="auto-cashout-status">Auto cashout disattivato</p>
+        <p>Puntata corrente: <span id="current-bet">-</span></p>
+        <p>Ultima vincita/perdita: <span id="last-result">-</span></p>
         <p>Punteggio ultimo cashout: <span id="last-cashout">-</span></p>
         <p>Punteggio migliore: <span id="best-cashout">-</span></p>
+    </div>
+
+    <div class="round-history">
+        <h2>Ultimi 10 round</h2>
+        <div id="history-list" class="history-list"></div>
     </div>
 </div>
 
