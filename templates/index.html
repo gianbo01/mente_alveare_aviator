@@ -2,72 +2,128 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>Mente Alveare Aviator Demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mente Alveare Aviator</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-<div class="game-container">
-    <h1>Mente Alveare - Demo Aviator</h1>
-    <p class="subtitle">Il gioco preferito delle nonne sicule</p>
-
-    <div class="play-area">
-        <canvas id="trail-canvas"></canvas>
-
-        <div class="van-container" id="van">
-            <img id="van-img" src="{{ url_for('static', filename='img/fiat_scudo.png') }}" alt="Fiat Scudo nero">
+<main class="aviator-shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">mente alveare</p>
+            <h1>aviator</h1>
         </div>
-
-
-        <div class="multiplier">
-            <span id="multiplier-value">1.00x</span>
+        <div class="topbar-actions">
+            <div class="user-chip">
+                <span id="header-nickname">guest</span>
+                <strong><span id="header-balance">1000.00</span> monete</strong>
+            </div>
+            <div class="topbar-status">demo wallet</div>
+            <button id="mute-toggle" class="mute-toggle" type="button" aria-label="attiva o disattiva audio" aria-pressed="false">🔊</button>
+            <div class="settings-wrap">
+                <button id="settings-toggle" class="settings-toggle" type="button" aria-label="impostazioni">⚙</button>
+                <div id="settings-menu" class="settings-menu" hidden>
+                    <button id="reset-account-btn" type="button">reset account</button>
+                </div>
+            </div>
         </div>
+    </header>
 
-        <div class="status" id="status-text">
-            Premi "Nuovo round" per iniziare
-        </div>
-    </div>
+    <section class="global-history-strip" aria-label="storico crash globale">
+        <div id="global-history-list" class="global-history-list"></div>
+    </section>
 
-    <div class="wallet-panel">
+    <section class="game-layout">
+        <section class="flight-stage" aria-label="grafico del round">
+            <canvas id="trail-canvas"></canvas>
+
+            <div class="multiplier">
+                <span id="multiplier-value">1.00x</span>
+            </div>
+
+            <div class="status" id="status-text">
+                premi scommetti per iniziare
+            </div>
+
+            <div class="van-container" id="van" aria-hidden="true">
+                <img id="van-img" src="{{ url_for('static', filename='img/fiat_scudo.png') }}" alt="">
+            </div>
+        </section>
+
+        <aside class="players-panel" aria-label="giocatori connessi">
+            <div class="players-heading">
+                <h2>Giocatori (<span id="players-count">0</span>)</h2>
+                <span>live</span>
+            </div>
+            <div id="players-list" class="players-list"></div>
+        </aside>
+    </section>
+
+    <section class="bet-panel" aria-label="pannello puntata">
         <div class="wallet-stat">
-            <span>Saldo</span>
+            <span>saldo</span>
             <strong><span id="balance-value">1000.00</span> monete</strong>
         </div>
 
         <label class="bet-control" for="bet-input">
-            <span>Puntata</span>
+            <span>puntata</span>
             <input id="bet-input" type="number" min="1" value="10" step="1">
         </label>
 
-        <label class="auto-cashout-toggle">
-            <input id="auto-cashout-enabled" type="checkbox">
-            <span>Auto cashout</span>
-        </label>
+        <div class="auto-cashout-box">
+            <label class="auto-cashout-toggle">
+                <input id="auto-cashout-enabled" type="checkbox">
+                <span>auto cashout</span>
+            </label>
 
-        <label class="auto-cashout-control" for="auto-cashout-input">
-            <span>Auto cashout a:</span>
-            <input id="auto-cashout-input" type="number" min="1.01" value="2.00" step="0.01">
-        </label>
-    </div>
+            <label class="auto-cashout-control" for="auto-cashout-input">
+                <span>a</span>
+                <input id="auto-cashout-input" type="number" min="1.01" value="1.40" step="0.01">
+            </label>
+        </div>
 
-    <div class="controls">
-        <button id="start-btn">Nuovo round</button>
-        <button id="cashout-btn" disabled>Esci (Cashout)</button>
-    </div>
+        <div class="actions">
+            <button id="start-btn" class="bet-button">scommetti</button>
+            <button id="cashout-btn" class="cashout-button" disabled>cashout</button>
+        </div>
+    </section>
 
-    <div class="scoreboard">
-        <p id="auto-cashout-status" class="auto-cashout-status">Auto cashout disattivato</p>
-        <p>Puntata corrente: <span id="current-bet">-</span></p>
-        <p>Ultima vincita/perdita: <span id="last-result">-</span></p>
-        <p>Punteggio ultimo cashout: <span id="last-cashout">-</span></p>
-        <p>Punteggio migliore: <span id="best-cashout">-</span></p>
-    </div>
+    <section class="round-meta" aria-label="riepilogo round">
+        <p id="auto-cashout-status" class="auto-cashout-status">auto cashout disattivato</p>
+        <p>puntata corrente: <span id="current-bet">-</span></p>
+        <p>ultima vincita/perdita: <span id="last-result">-</span></p>
+        <p>ultimo cashout: <span id="last-cashout">-</span></p>
+        <p>migliore: <span id="best-cashout">-</span></p>
+    </section>
 
-    <div class="round-history">
-        <h2>Ultimi 10 round</h2>
+    <section class="round-history">
+        <div class="history-heading">
+            <h2>ultimi 10 round</h2>
+            <span>crash history</span>
+        </div>
+        <div class="history-table-head" aria-hidden="true">
+            <span>ora</span>
+            <span>crash</span>
+            <span>puntata</span>
+            <span>uscita</span>
+            <span>vincita</span>
+        </div>
         <div id="history-list" class="history-list"></div>
-    </div>
+    </section>
+</main>
+
+<div id="welcome-modal" class="welcome-modal" hidden>
+    <form id="welcome-form" class="welcome-card">
+        <p class="eyebrow">prima di decollare</p>
+        <h2>scegli il tuo nickname</h2>
+        <p class="welcome-copy">massimo 16 caratteri, salvato solo su questo browser.</p>
+        <input id="nickname-input" type="text" maxlength="16" autocomplete="off" required placeholder="nickname">
+        <button type="submit">entra nel gioco</button>
+    </form>
 </div>
 
+<script src="{{ url_for('static', filename='js/audio.js') }}"></script>
+<script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 </body>
 </html>
