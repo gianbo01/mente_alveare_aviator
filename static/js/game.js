@@ -17,6 +17,7 @@ const GAMES_PLAYED_STORAGE_KEY = "aviator_games_played";
 const GAMES_WON_STORAGE_KEY = "aviator_games_won";
 const TOTAL_WON_STORAGE_KEY = "aviator_total_won";
 const LEADERBOARD_ENTRY_STORAGE_KEY = "aviator_leaderboard_entry";
+const MUSIC_OPEN_STORAGE_KEY = "aviator_music_open";
 const MAX_HISTORY_ITEMS = 50;
 const MAX_VISIBLE_HISTORY_ITEMS = 10;
 const MIN_AUTO_CASHOUT = 1.01;
@@ -72,11 +73,14 @@ const settingsMenu = document.getElementById("settings-menu");
 const resetAccountBtn = document.getElementById("reset-account-btn");
 const playersCountEl = document.getElementById("players-count");
 const playersListEl = document.getElementById("players-list");
+const spotifyPanel = document.getElementById("spotify-panel");
+const spotifyToggle = document.getElementById("spotify-toggle");
 
 initSessionUI();
 updateWalletUI();
 updateAutoCashoutUI();
 renderRoundHistory();
+initSpotifyPanel();
 
 
 // ======== CANVAS SCIA ========
@@ -112,6 +116,7 @@ autoCashoutInput.addEventListener("input", updateAutoCashoutUI);
 welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 settingsToggle.addEventListener("click", toggleSettingsMenu);
 resetAccountBtn.addEventListener("click", resetAccount);
+spotifyToggle.addEventListener("click", toggleSpotifyPanel);
 
 const socket = io();
 
@@ -806,6 +811,23 @@ function resetAccount() {
 
     localStorage.clear();
     window.location.reload();
+}
+
+function initSpotifyPanel() {
+    const isOpen = localStorage.getItem(MUSIC_OPEN_STORAGE_KEY) === "true";
+    setSpotifyPanelOpen(isOpen);
+}
+
+function toggleSpotifyPanel() {
+    setSpotifyPanelOpen(spotifyPanel.hidden);
+}
+
+function setSpotifyPanelOpen(isOpen) {
+    spotifyPanel.hidden = !isOpen;
+    spotifyPanel.classList.toggle("open", isOpen);
+    spotifyToggle.setAttribute("aria-expanded", String(isOpen));
+    localStorage.setItem(MUSIC_OPEN_STORAGE_KEY, String(isOpen));
+    window.aviatorAudio?.setMusicPlaying(isOpen);
 }
 
 function loadStoredNumber(key) {

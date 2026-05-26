@@ -3,6 +3,7 @@
 (function () {
     let audioContext = null;
     let muted = localStorage.getItem("aviator_audio_muted") === "true";
+    let musicDuckingFactor = 1;
     let lastTickerTime = 0;
 
     function init() {
@@ -29,7 +30,7 @@
         oscillator.type = type;
         oscillator.frequency.setValueAtTime(frequency, now);
         gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(volume * musicDuckingFactor, now + 0.01);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
         oscillator.connect(gain);
@@ -76,7 +77,7 @@
         filter.frequency.setValueAtTime(420, now);
         filter.frequency.exponentialRampToValueAtTime(90, now + duration);
 
-        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.setValueAtTime(0.18 * musicDuckingFactor, now);
         gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
         source.buffer = buffer;
@@ -104,6 +105,11 @@
         return muted;
     }
 
+    function setMusicPlaying(isPlaying) {
+        // Quando Spotify è aperto, abbassiamo i suoni del gioco per non coprire la musica.
+        musicDuckingFactor = isPlaying ? 0.3 : 1;
+    }
+
     function updateMuteButton() {
         const muteButton = document.getElementById("mute-toggle");
         if (!muteButton) return;
@@ -129,6 +135,7 @@
         init,
         toggleMute,
         isMuted,
+        setMusicPlaying,
         playBetClick,
         playTicker,
         playCrash,

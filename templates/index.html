@@ -122,6 +122,15 @@
     </form>
 </div>
 
+<div id="spotify-panel" class="spotify-panel" hidden>
+    <iframe data-testid="embed-iframe" style="border-radius:12px"
+      src="https://open.spotify.com/embed/playlist/2IEN5NybObl94FwA3tLVev?utm_source=generator&theme=0"
+      width="100%" height="152" frameBorder="0" allowfullscreen=""
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      loading="lazy"></iframe>
+</div>
+<button id="spotify-toggle" class="spotify-toggle" type="button" aria-label="Musica" title="Musica" aria-expanded="false">🎵</button>
+
 <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
 <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game.js') }}"></script>
