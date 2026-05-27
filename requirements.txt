@@ -1,2 +1,5 @@
 Flask>=3.0,<4.0
 Flask-SocketIO>=5.3,<6.0
+flask-login
+werkzeug
+mutagen

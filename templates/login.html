@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Mente Alveare Aviator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+<main class="auth-shell">
+    <form class="auth-card" method="post">
+        <p class="eyebrow">mente alveare</p>
+        <h1>login</h1>
+        <p class="auth-copy">accedi per usare il wallet server-side.</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <p class="auth-error">{{ messages[0] }}</p>
+            {% endif %}
+        {% endwith %}
+
+        <label>
+            <span>username</span>
+            <input name="username" type="text" maxlength="16" autocomplete="username" required>
+        </label>
+
+        <label>
+            <span>password</span>
+            <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+
+        <button type="submit">entra</button>
+        <a href="/register">non hai un account? registrati</a>
+    </form>
+</main>
+</body>
+</html>

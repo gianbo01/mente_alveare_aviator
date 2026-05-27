@@ -24,6 +24,7 @@
                 <button id="settings-toggle" class="settings-toggle" type="button" aria-label="impostazioni">⚙</button>
                 <div id="settings-menu" class="settings-menu" hidden>
                     <button id="reset-account-btn" type="button">reset account</button>
+                    <a href="/logout">logout</a>
                 </div>
             </div>
         </div>
@@ -85,6 +86,7 @@
         <div class="actions">
             <button id="start-btn" class="bet-button">scommetti</button>
             <button id="cashout-btn" class="cashout-button" disabled>cashout</button>
+            <button id="cancel-queued-bet-btn" class="cancel-queued-button" type="button" hidden>annulla puntata preparata</button>
         </div>
     </section>
 
@@ -112,27 +114,24 @@
     </section>
 </main>
 
-<div id="welcome-modal" class="welcome-modal" hidden>
-    <form id="welcome-form" class="welcome-card">
-        <p class="eyebrow">prima di decollare</p>
-        <h2>scegli il tuo nickname</h2>
-        <p class="welcome-copy">massimo 16 caratteri, salvato solo su questo browser.</p>
-        <input id="nickname-input" type="text" maxlength="16" autocomplete="off" required placeholder="nickname">
-        <button type="submit">entra nel gioco</button>
-    </form>
+<div id="radio-panel" class="radio-panel" hidden>
+    <div class="radio-heading">
+        <strong>Radio Sincronizzata 🔴</strong>
+        <span id="radio-index">0 / 0</span>
+    </div>
+    <p id="radio-title" class="radio-title">nessun brano</p>
+    <div class="radio-progress-track" aria-hidden="true">
+        <span id="radio-progress" class="radio-progress-fill"></span>
+    </div>
+    <div class="radio-controls">
+        <button id="radio-play-toggle" type="button">▶ Avvia Radio</button>
+    </div>
 </div>
-
-<div id="spotify-panel" class="spotify-panel" hidden>
-    <iframe data-testid="embed-iframe" style="border-radius:12px"
-      src="https://open.spotify.com/embed/playlist/2IEN5NybObl94FwA3tLVev?utm_source=generator&theme=0"
-      width="100%" height="152" frameBorder="0" allowfullscreen=""
-      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-      loading="lazy"></iframe>
-</div>
-<button id="spotify-toggle" class="spotify-toggle" type="button" aria-label="Musica" title="Musica" aria-expanded="false">🎵</button>
+<button id="radio-toggle" class="radio-toggle" type="button" aria-label="Musica" title="Musica" aria-expanded="false">🎵</button>
 
 <script src="{{ url_for('static', filename='js/audio.js') }}"></script>
 <script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/radio.js') }}"></script>
 <script src="{{ url_for('static', filename='js/game.js') }}"></script>
 </body>
 </html>

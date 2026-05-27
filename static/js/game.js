@@ -8,23 +8,19 @@ let countdownActive = false;
 
 let lastCashout = null;
 
-const INITIAL_BALANCE = 1000;
-const USER_STORAGE_KEY = "aviator_user";
-const BALANCE_STORAGE_KEY = "aviator_balance";
 const HISTORY_STORAGE_KEY = "aviator_round_history";
 const BEST_CASHOUT_STORAGE_KEY = "aviator_best_cashout";
 const GAMES_PLAYED_STORAGE_KEY = "aviator_games_played";
 const GAMES_WON_STORAGE_KEY = "aviator_games_won";
 const TOTAL_WON_STORAGE_KEY = "aviator_total_won";
 const LEADERBOARD_ENTRY_STORAGE_KEY = "aviator_leaderboard_entry";
-const MUSIC_OPEN_STORAGE_KEY = "aviator_music_open";
 const MAX_HISTORY_ITEMS = 50;
 const MAX_VISIBLE_HISTORY_ITEMS = 10;
 const MIN_AUTO_CASHOUT = 1.01;
 const MULTIPLIER_GROWTH = 1.012;
 
-let currentUser = loadUser();
-let balance = loadBalance();
+let currentUser = null;
+let balance = 0;
 let currentBet = 0;
 let roundHistory = loadRoundHistory();
 let bestCashout = loadBestCashout();
@@ -41,6 +37,9 @@ let serverTimeOffset = 0;
 let acceptingBets = false;
 let hasActiveBet = false;
 let hasCashedOut = false;
+let hasQueuedBet = false;
+let queuedBet = 0;
+let queuedAutoCashoutThreshold = null;
 let globalHistory = [];
 let previousPlayerStates = new Map();
 
@@ -48,6 +47,7 @@ const multiplierEl = document.getElementById("multiplier-value");
 const statusEl = document.getElementById("status-text");
 const startBtn = document.getElementById("start-btn");
 const cashoutBtn = document.getElementById("cashout-btn");
+const cancelQueuedBetBtn = document.getElementById("cancel-queued-bet-btn");
 const balanceEl = document.getElementById("balance-value");
 const headerNicknameEl = document.getElementById("header-nickname");
 const headerBalanceEl = document.getElementById("header-balance");
@@ -65,22 +65,15 @@ const vanContainer = document.getElementById("van");
 const vanImg = document.getElementById("van-img");
 const flightStageEl = document.querySelector(".flight-stage");
 const betPanelEl = document.querySelector(".bet-panel");
-const welcomeModal = document.getElementById("welcome-modal");
-const welcomeForm = document.getElementById("welcome-form");
-const nicknameInput = document.getElementById("nickname-input");
 const settingsToggle = document.getElementById("settings-toggle");
 const settingsMenu = document.getElementById("settings-menu");
 const resetAccountBtn = document.getElementById("reset-account-btn");
 const playersCountEl = document.getElementById("players-count");
 const playersListEl = document.getElementById("players-list");
-const spotifyPanel = document.getElementById("spotify-panel");
-const spotifyToggle = document.getElementById("spotify-toggle");
 
-initSessionUI();
 updateWalletUI();
 updateAutoCashoutUI();
 renderRoundHistory();
-initSpotifyPanel();
 
 
 // ======== CANVAS SCIA ========
@@ -110,15 +103,15 @@ resetVanPosition();
 // ======== ROUND ========
 startBtn.addEventListener("click", startRound);
 cashoutBtn.addEventListener("click", cashout);
+cancelQueuedBetBtn.addEventListener("click", cancelQueuedBet);
 betInput.addEventListener("input", updateBetInputLimits);
 autoCashoutEnabled.addEventListener("change", updateAutoCashoutUI);
 autoCashoutInput.addEventListener("input", updateAutoCashoutUI);
-welcomeForm.addEventListener("submit", handleWelcomeSubmit);
 settingsToggle.addEventListener("click", toggleSettingsMenu);
 resetAccountBtn.addEventListener("click", resetAccount);
-spotifyToggle.addEventListener("click", toggleSpotifyPanel);
 
-const socket = io();
+const socket = window.aviatorSocket || io();
+window.aviatorSocket = socket;
 
 socket.on("connect", () => {
     socket.emit("join");
@@ -130,11 +123,14 @@ socket.on("round_start", handleRoundStart);
 socket.on("tick", handleServerTick);
 socket.on("crash", handleServerCrash);
 socket.on("players_update", data => renderPlayersPanel(data.players || []));
+socket.on("bet_activated", handleBetActivated);
 
-function startRound() {
-    if (running || countdownActive) return;
-    if (!acceptingBets || !currentRoundId) {
-        statusEl.textContent = "round già in corso, attendi il prossimo";
+initializeAccount();
+
+async function startRound() {
+    if (hasActiveBet || hasQueuedBet) return;
+    if (!currentRoundId) {
+        statusEl.textContent = "round non disponibile, attendi il prossimo";
         return;
     }
 
@@ -144,29 +140,58 @@ function startRound() {
     const requestedAutoCashout = autoCashoutEnabled.checked ? getAutoCashoutValue() : null;
     if (autoCashoutEnabled.checked && !requestedAutoCashout) return;
 
+    startBtn.disabled = true;
+    let result = null;
+
+    try {
+        const response = await fetch("/api/bet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: bet })
+        });
+        result = await response.json();
+
+        if (!result.ok) {
+            statusEl.textContent = result.error || "Saldo insufficiente";
+            updateLiveRoundUI();
+            return;
+        }
+
+        const serverBalance = Number(result.balance);
+        if (Number.isFinite(serverBalance)) balance = serverBalance;
+    } catch {
+        statusEl.textContent = "Errore di connessione al server.";
+        updateLiveRoundUI();
+        return;
+    }
+
     window.aviatorAudio?.init();
     window.aviatorAudio?.playBetClick();
 
+    hasQueuedBet = true;
+    queuedBet = bet;
+    queuedAutoCashoutThreshold = requestedAutoCashout;
+    statusEl.textContent = isBettingWindowOpen() ? `puntata preparata, decollo tra ${getStartCountdown()}s` : "puntata preparata per il prossimo decollo";
+    currentBetEl.textContent = formatCoins(queuedBet) + " monete (prossimo)";
+    lastResultEl.textContent = "-";
+    updateWalletUI();
+    updateQueuedBetUI();
+    updateAutoCashoutUI();
+}
+
+function applyActiveBet(bet, requestedAutoCashout) {
     revealedCrashPoint = null;
     pendingHistoryRecordId = null;
     currentBet = bet;
     autoCashoutThreshold = requestedAutoCashout;
     hasActiveBet = true;
     hasCashedOut = false;
-    balance -= currentBet;
-    saveBalance();
-    socket.emit("player_bet", { bet: currentBet });
-
-    statusEl.textContent = `puntata piazzata, partenza tra ${getStartCountdown()}s`;
+    currentBetEl.textContent = formatCoins(currentBet) + " monete";
     startBtn.disabled = true;
     cashoutBtn.disabled = true;
     betInput.disabled = true;
     autoCashoutEnabled.disabled = true;
     autoCashoutInput.disabled = true;
-    currentBetEl.textContent = formatCoins(currentBet) + " monete";
-    lastResultEl.textContent = "-";
-    updateWalletUI();
-    updateAutoCashoutUI();
 }
 
 function handleRoundState(data) {
@@ -178,7 +203,7 @@ function handleRoundState(data) {
     roundStartedAt = data.started_at;
     currentMultiplier = Number(data.multiplier_now) || 1;
     roundPhase = data.active ? (isBettingWindowOpen() ? "betting" : "running") : "crashed";
-    acceptingBets = data.active && isBettingWindowOpen() && !hasActiveBet && !hasCashedOut;
+    acceptingBets = data.active && isBettingWindowOpen() && !hasActiveBet && !hasCashedOut && !hasQueuedBet;
     resetRound(currentMultiplier);
 
     if (!data.active) {
@@ -203,7 +228,7 @@ function handleRoundStart(data) {
     running = false;
     crashed = false;
     roundPhase = "betting";
-    acceptingBets = true;
+    acceptingBets = !hasQueuedBet;
     hasActiveBet = false;
     hasCashedOut = false;
     pendingHistoryRecordId = null;
@@ -211,18 +236,20 @@ function handleRoundStart(data) {
     currentBet = 0;
     autoCashoutThreshold = null;
     currentBetEl.textContent = "-";
+
     lastResultEl.textContent = "-";
     resetRound(1);
     multiplierEl.classList.remove("running", "crashed", "cashed-out");
     vanContainer.classList.remove("flying", "crashed");
     vanImg.classList.remove("flying", "crashed");
-    betInput.disabled = false;
-    autoCashoutEnabled.disabled = false;
-    autoCashoutInput.disabled = false;
+    betInput.disabled = hasActiveBet || hasQueuedBet;
+    autoCashoutEnabled.disabled = hasActiveBet || hasQueuedBet;
+    autoCashoutInput.disabled = hasActiveBet || hasQueuedBet;
     cashoutBtn.disabled = true;
     statusEl.classList.remove("countdown");
-    statusEl.textContent = `puntate aperte, partenza tra ${getStartCountdown()}s`;
+    statusEl.textContent = hasQueuedBet ? `puntata preparata, decollo tra ${getStartCountdown()}s` : `puntate aperte, partenza tra ${getStartCountdown()}s`;
     updateWalletUI();
+    updateQueuedBetUI();
     updateAutoCashoutUI();
 }
 
@@ -233,7 +260,7 @@ function handleServerTick(data) {
     currentMultiplier = Number(data.multiplier) || 1;
     time = estimateTimeForMultiplier(currentMultiplier);
     roundPhase = isBettingWindowOpen() ? "betting" : "running";
-    acceptingBets = roundPhase === "betting" && !hasActiveBet && !hasCashedOut;
+    acceptingBets = roundPhase === "betting" && !hasActiveBet && !hasCashedOut && !hasQueuedBet;
 
     renderSpectatorFrame();
 
@@ -266,6 +293,19 @@ function handleServerCrash(data) {
 
     statusEl.textContent = `crash a ${revealedCrashPoint.toFixed(2)}x, prossimo round in 5s`;
     startNextRoundCountdown();
+}
+
+function handleBetActivated(data) {
+    if (data.round_id !== currentRoundId || !hasQueuedBet) return;
+
+    applyActiveBet(Number(data.amount) || queuedBet, queuedAutoCashoutThreshold);
+    hasQueuedBet = false;
+    queuedBet = 0;
+    queuedAutoCashoutThreshold = null;
+    statusEl.textContent = "puntata attiva, decollo!";
+    updateWalletUI();
+    updateQueuedBetUI();
+    updateAutoCashoutUI();
 }
 
 function renderSpectatorFrame() {
@@ -345,22 +385,24 @@ function getStartCountdown() {
 
 function updateLiveRoundUI() {
     if (roundPhase === "betting") {
-        statusEl.textContent = hasActiveBet ? `puntata piazzata, partenza tra ${getStartCountdown()}s` : `puntate aperte, partenza tra ${getStartCountdown()}s`;
-        startBtn.disabled = hasActiveBet || balance < 1;
+        statusEl.textContent = hasActiveBet ? `puntata piazzata, partenza tra ${getStartCountdown()}s` : (hasQueuedBet ? `puntata preparata, decollo tra ${getStartCountdown()}s` : `puntate aperte, partenza tra ${getStartCountdown()}s`);
+        startBtn.disabled = hasActiveBet || hasQueuedBet || balance < 1;
         cashoutBtn.disabled = true;
-        betInput.disabled = hasActiveBet;
-        autoCashoutEnabled.disabled = hasActiveBet;
-        autoCashoutInput.disabled = hasActiveBet;
+        betInput.disabled = hasActiveBet || hasQueuedBet;
+        autoCashoutEnabled.disabled = hasActiveBet || hasQueuedBet;
+        autoCashoutInput.disabled = hasActiveBet || hasQueuedBet;
         multiplierEl.classList.remove("running");
+        updateQueuedBetUI();
         return;
     }
 
-    statusEl.textContent = hasCashedOut ? `uscito a ${lastCashout.toFixed(2)}x, attendi crash finale` : "round in corso";
-    startBtn.disabled = true;
+    statusEl.textContent = hasCashedOut ? `uscito a ${lastCashout.toFixed(2)}x, attendi crash finale` : (hasQueuedBet ? "puntata preparata per il prossimo round" : "round in corso, puoi preparare la prossima puntata");
+    startBtn.disabled = hasActiveBet || hasQueuedBet || balance < 1;
     cashoutBtn.disabled = !(hasActiveBet && !hasCashedOut);
-    betInput.disabled = true;
-    autoCashoutEnabled.disabled = true;
-    autoCashoutInput.disabled = true;
+    betInput.disabled = hasActiveBet || hasQueuedBet;
+    autoCashoutEnabled.disabled = hasActiveBet || hasQueuedBet;
+    autoCashoutInput.disabled = hasActiveBet || hasQueuedBet;
+    updateQueuedBetUI();
 }
 
 function estimateTimeForMultiplier(multiplier) {
@@ -576,27 +618,51 @@ function updateMultiplier() {
     multiplierEl.textContent = currentMultiplier.toFixed(2) + "x";
 }
 
-function cashout() {
+async function cashout() {
     if (!hasActiveBet || hasCashedOut || crashed) return;
+
+    cashoutBtn.disabled = true;
+
+    lastCashout = currentMultiplier;
+
+    let payout = currentBet * currentMultiplier;
+    try {
+        const response = await fetch("/api/cashout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ multiplier: lastCashout })
+        });
+        const result = await response.json();
+
+        if (!result.ok) {
+            statusEl.textContent = result.error || "Cashout non disponibile";
+            cashoutBtn.disabled = false;
+            return;
+        }
+
+        const serverBalance = Number(result.balance);
+        const serverWon = Number(result.won);
+        if (Number.isFinite(serverBalance)) balance = serverBalance;
+        if (Number.isFinite(serverWon)) payout = serverWon;
+    } catch {
+        statusEl.textContent = "Errore di connessione al server.";
+        cashoutBtn.disabled = false;
+        return;
+    }
 
     running = false;
     clearInterval(intervalId);
     startBtn.disabled = true;
-    cashoutBtn.disabled = true;
     betInput.disabled = true;
     autoCashoutEnabled.disabled = true;
     autoCashoutInput.disabled = true;
 
-    lastCashout = currentMultiplier;
     if (!bestCashout || lastCashout > bestCashout) {
         bestCashout = lastCashout;
         saveBestCashout();
     }
 
-    const payout = currentBet * currentMultiplier;
     const netProfit = payout - currentBet;
-    balance += payout;
-    saveBalance();
 
     lastCashoutEl.textContent = lastCashout.toFixed(2) + "x";
     bestCashoutEl.textContent = bestCashout.toFixed(2) + "x";
@@ -617,7 +683,6 @@ function cashout() {
     revealedCrashPoint = null;
     hasActiveBet = false;
     hasCashedOut = true;
-    socket.emit("player_cashout", { multiplier: lastCashout });
     updateWalletUI();
     updateAutoCashoutUI();
 
@@ -696,13 +761,13 @@ function startNextRoundCountdown() {
 
     clearInterval(countdownId);
     countdownActive = true;
-    startBtn.disabled = true;
+    startBtn.disabled = hasQueuedBet || balance < 1;
     cashoutBtn.disabled = true;
-    betInput.disabled = true;
-    autoCashoutEnabled.disabled = true;
-    autoCashoutInput.disabled = true;
+    betInput.disabled = hasQueuedBet;
+    autoCashoutEnabled.disabled = hasQueuedBet;
+    autoCashoutInput.disabled = hasQueuedBet;
     statusEl.classList.add("countdown");
-    statusEl.textContent = `Prossimo round in ${remainingSeconds}s`;
+    statusEl.textContent = hasQueuedBet ? `puntata preparata, prossimo round in ${remainingSeconds}s` : `Prossimo round in ${remainingSeconds}s`;
 
     countdownId = setInterval(() => {
         remainingSeconds -= 1;
@@ -712,7 +777,7 @@ function startNextRoundCountdown() {
             return;
         }
 
-        statusEl.textContent = `Prossimo round in ${remainingSeconds}s`;
+        statusEl.textContent = hasQueuedBet ? `puntata preparata, prossimo round in ${remainingSeconds}s` : `Prossimo round in ${remainingSeconds}s`;
     }, 1000);
 }
 
@@ -724,81 +789,45 @@ function finishNextRoundCountdown() {
     statusEl.textContent = "attendi apertura puntate";
     multiplierEl.classList.remove("running", "crashed", "cashed-out");
     vanContainer.classList.remove("flying", "crashed");
-    betInput.disabled = true;
-    autoCashoutEnabled.disabled = true;
-    autoCashoutInput.disabled = true;
+    betInput.disabled = hasQueuedBet;
+    autoCashoutEnabled.disabled = hasQueuedBet;
+    autoCashoutInput.disabled = hasQueuedBet;
     cashoutBtn.disabled = true;
+    startBtn.disabled = hasQueuedBet || balance < 1;
+    updateQueuedBetUI();
     updateAutoCashoutUI();
 }
 
-function initSessionUI() {
-    if (currentUser) {
-        hideWelcomeModal();
-    } else {
-        showWelcomeModal();
-    }
-
-    updateSessionHeader();
-    saveLeaderboardEntry();
-}
-
-function loadUser() {
+async function initializeAccount() {
     try {
-        const storedUser = JSON.parse(localStorage.getItem(USER_STORAGE_KEY));
-        if (storedUser && typeof storedUser.nickname === "string" && storedUser.nickname.trim()) {
-            return {
-                nickname: storedUser.nickname.trim().slice(0, 16),
-                createdAt: storedUser.createdAt || Date.now()
-            };
+        const response = await fetch("/api/balance");
+        if (response.redirected) {
+            window.location.href = response.url;
+            return;
         }
+
+        const data = await response.json();
+        currentUser = { username: data.username };
+        balance = Number(data.balance) || 0;
+        const serverQueuedBet = Number(data.queued_bet);
+        if (Number.isFinite(serverQueuedBet) && serverQueuedBet > 0) {
+            hasQueuedBet = true;
+            queuedBet = serverQueuedBet;
+            currentBetEl.textContent = formatCoins(queuedBet) + " monete (prossimo)";
+            statusEl.textContent = "puntata preparata per il prossimo round";
+        }
+        updateWalletUI();
+        updateQueuedBetUI();
+        saveLeaderboardEntry();
+
+        if (socket.connected) socket.emit("player_join", { nickname: getCurrentNickname() });
     } catch {
-        return null;
+        statusEl.textContent = "Errore nel caricamento del saldo.";
     }
-
-    return null;
-}
-
-function saveUser(user) {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-}
-
-function showWelcomeModal() {
-    welcomeModal.hidden = false;
-    document.body.classList.add("session-locked");
-    setTimeout(() => nicknameInput.focus(), 0);
-}
-
-function hideWelcomeModal() {
-    welcomeModal.hidden = true;
-    document.body.classList.remove("session-locked");
-}
-
-function handleWelcomeSubmit(event) {
-    event.preventDefault();
-
-    const nickname = nicknameInput.value.trim().slice(0, 16);
-    if (!nickname) return;
-
-    currentUser = {
-        nickname,
-        createdAt: Date.now()
-    };
-
-    saveUser(currentUser);
-
-    if (localStorage.getItem(BALANCE_STORAGE_KEY) === null) {
-        balance = INITIAL_BALANCE;
-        saveBalance();
-    }
-
-    hideWelcomeModal();
-    updateWalletUI();
-    saveLeaderboardEntry();
-    if (socket.connected) socket.emit("player_join", { nickname: currentUser.nickname });
 }
 
 function updateSessionHeader() {
-    headerNicknameEl.textContent = currentUser ? currentUser.nickname : "guest";
+    headerNicknameEl.textContent = currentUser ? currentUser.username : "guest";
     headerBalanceEl.textContent = formatCoins(balance);
 }
 
@@ -807,27 +836,57 @@ function toggleSettingsMenu() {
 }
 
 function resetAccount() {
-    if (!confirm("Vuoi davvero resettare l'account? Tutti i dati locali verranno cancellati.")) return;
+    if (!confirm("Vuoi davvero resettare i dati locali? Il saldo server non verrà cancellato.")) return;
 
     localStorage.clear();
     window.location.reload();
 }
 
-function initSpotifyPanel() {
-    const isOpen = localStorage.getItem(MUSIC_OPEN_STORAGE_KEY) === "true";
-    setSpotifyPanelOpen(isOpen);
+async function cancelQueuedBet() {
+    if (!hasQueuedBet) return;
+
+    cancelQueuedBetBtn.disabled = true;
+
+    try {
+        const response = await fetch("/api/bet/cancel", { method: "POST" });
+        const result = await response.json();
+
+        if (!result.ok) {
+            statusEl.textContent = result.error || "Impossibile annullare la puntata preparata";
+            cancelQueuedBetBtn.disabled = false;
+            return;
+        }
+
+        const serverBalance = Number(result.balance);
+        if (Number.isFinite(serverBalance)) balance = serverBalance;
+
+        hasQueuedBet = false;
+        queuedBet = 0;
+        queuedAutoCashoutThreshold = null;
+        currentBetEl.textContent = "-";
+        statusEl.textContent = "puntata preparata annullata";
+        updateWalletUI();
+        updateQueuedBetUI();
+        updateLiveRoundUI();
+        updateAutoCashoutUI();
+    } catch {
+        statusEl.textContent = "Errore di connessione al server.";
+        cancelQueuedBetBtn.disabled = false;
+    }
 }
 
-function toggleSpotifyPanel() {
-    setSpotifyPanelOpen(spotifyPanel.hidden);
-}
+function updateQueuedBetUI() {
+    cancelQueuedBetBtn.hidden = !hasQueuedBet;
+    cancelQueuedBetBtn.disabled = !hasQueuedBet;
 
-function setSpotifyPanelOpen(isOpen) {
-    spotifyPanel.hidden = !isOpen;
-    spotifyPanel.classList.toggle("open", isOpen);
-    spotifyToggle.setAttribute("aria-expanded", String(isOpen));
-    localStorage.setItem(MUSIC_OPEN_STORAGE_KEY, String(isOpen));
-    window.aviatorAudio?.setMusicPlaying(isOpen);
+    if (hasQueuedBet) {
+        startBtn.disabled = true;
+        cashoutBtn.disabled = true;
+        betInput.disabled = true;
+        autoCashoutEnabled.disabled = true;
+        autoCashoutInput.disabled = true;
+        currentBetEl.textContent = formatCoins(queuedBet) + " monete (prossimo)";
+    }
 }
 
 function loadStoredNumber(key) {
@@ -861,22 +920,13 @@ function recordRoundResult(won, netProfit) {
 
 function saveLeaderboardEntry() {
     const entry = {
-        nickname: currentUser ? currentUser.nickname : "guest",
+        nickname: currentUser ? currentUser.username : "guest",
         bestCashout: bestCashout || 0,
         totalWon,
         gamesPlayed
     };
 
     localStorage.setItem(LEADERBOARD_ENTRY_STORAGE_KEY, JSON.stringify(entry));
-}
-
-function loadBalance() {
-    const storedBalance = Number(localStorage.getItem(BALANCE_STORAGE_KEY));
-    return Number.isFinite(storedBalance) && storedBalance >= 0 ? storedBalance : INITIAL_BALANCE;
-}
-
-function saveBalance() {
-    localStorage.setItem(BALANCE_STORAGE_KEY, balance.toFixed(2));
 }
 
 function loadRoundHistory() {
@@ -1039,7 +1089,7 @@ function getPlayerAvatarColor(nickname) {
 }
 
 function getCurrentNickname() {
-    return currentUser?.nickname || "Ospite";
+    return currentUser?.username || "Ospite";
 }
 
 function escapeHtml(value) {
@@ -1093,8 +1143,9 @@ function updateWalletUI() {
     headerBalanceEl.textContent = formatCoins(balance);
     updateSessionHeader();
     if (bestCashout) bestCashoutEl.textContent = bestCashout.toFixed(2) + "x";
-    startBtn.disabled = running || countdownActive || balance < 1 || (roundPhase !== null && roundPhase !== "betting");
+    startBtn.disabled = hasActiveBet || hasQueuedBet || balance < 1 || !currentRoundId;
     updateBetInputLimits();
+    updateQueuedBetUI();
 }
 
 function updateBetInputLimits() {

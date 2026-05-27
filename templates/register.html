@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrazione - Mente Alveare Aviator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-page">
+<main class="auth-shell">
+    <form class="auth-card" method="post" onsubmit="return this.password.value === this.confirm_password.value || (alert('Le password non coincidono.'), false)">
+        <p class="eyebrow">nuovo pilota</p>
+        <h1>registrati</h1>
+        <p class="auth-copy">saldo iniziale: 1000 monete salvate su SQLite.</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <p class="auth-error">{{ messages[0] }}</p>
+            {% endif %}
+        {% endwith %}
+
+        <label>
+            <span>username</span>
+            <input name="username" type="text" maxlength="16" autocomplete="username" required>
+        </label>
+
+        <label>
+            <span>password</span>
+            <input name="password" type="password" autocomplete="new-password" required>
+        </label>
+
+        <label>
+            <span>conferma password</span>
+            <input name="confirm_password" type="password" autocomplete="new-password" required>
+        </label>
+
+        <button type="submit">crea account</button>
+        <a href="/login">hai già un account? login</a>
+    </form>
+</main>
+</body>
+</html>
