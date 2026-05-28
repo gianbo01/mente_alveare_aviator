@@ -14,6 +14,7 @@ Veicoli:
   - roulotte dei rom
   - gazzella della polizia delle docce
   - topolino dei carabinieri
+  - ape car truccata
 
 Brainroot alveari:
   - pesce verona
