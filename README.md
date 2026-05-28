@@ -34,6 +34,7 @@ Special guest:
   - andrea diprè
   - c19 (solo se giocato da tv)
   - la cavalletta
+  - la reliquia
 
 # TODO
   - gestione delle monete
