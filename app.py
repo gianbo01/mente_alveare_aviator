@@ -58,7 +58,7 @@ def load_user(user_id):
     return User(user["id"], user["username"], user["balance"])
 
 
-def init_radio():
+def load_radio_playlist():
     playlist = []
     durations = {}
 
@@ -78,6 +78,12 @@ def init_radio():
         except Exception:
             # Se la durata non è leggibile, usiamo una stima sicura per continuare la radio.
             durations[filename] = RADIO_FALLBACK_DURATION
+
+    return playlist, durations
+
+
+def init_radio():
+    playlist, durations = load_radio_playlist()
 
     with radio_lock:
         radio_state["playlist"] = playlist
@@ -118,10 +124,28 @@ def advance_radio_track():
             return None
 
         next_index = radio_state["current_index"] + 1
+        needs_reload = next_index >= len(radio_state["playlist"])
+
+    playlist = []
+    durations = {}
+    if needs_reload:
+        # Rileggiamo fuori dal lock: leggere durate MP3 può richiedere tempo.
+        playlist, durations = load_radio_playlist()
+
+    with radio_lock:
+        if not radio_state["playlist"]:
+            return None
+
+        next_index = radio_state["current_index"] + 1
 
         if next_index >= len(radio_state["playlist"]):
-            # A fine giro rimescoliamo la playlist per non ripetere sempre lo stesso ordine.
-            random.shuffle(radio_state["playlist"])
+            if playlist:
+                radio_state["playlist"] = playlist
+                radio_durations.clear()
+                radio_durations.update(durations)
+            else:
+                random.shuffle(radio_state["playlist"])
+
             next_index = 0
 
         radio_state["current_index"] = next_index

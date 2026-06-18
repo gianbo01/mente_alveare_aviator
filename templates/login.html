@@ -4,11 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Mente Alveare Aviator</title>
+    <meta name="theme-color" content="#0f1923">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Aviator">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="auth-page">
 <main class="auth-shell">
     <form class="auth-card" method="post">
+        <img class="auth-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Mente Alveare">
         <p class="eyebrow">mente alveare</p>
         <h1>login</h1>
         <p class="auth-copy">accedi per usare il wallet server-side.</p>

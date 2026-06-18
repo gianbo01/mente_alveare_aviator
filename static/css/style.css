@@ -48,6 +48,20 @@ body {
     box-shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
 }
 
+.brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-lockup img {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    object-fit: cover;
+    box-shadow: 0 0 24px rgba(255, 122, 24, 0.16);
+}
+
 .eyebrow {
     margin: 0 0 2px;
     color: var(--muted);
@@ -881,6 +895,14 @@ button:disabled {
     box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 
+.auth-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    object-fit: cover;
+    box-shadow: 0 0 28px rgba(255, 122, 24, 0.18);
+}
+
 .auth-card h1 {
     font-size: clamp(2rem, 10vw, 3.2rem);
 }
@@ -1127,6 +1149,16 @@ button:disabled {
 
     .topbar-status {
         display: none;
+    }
+
+    .brand-lockup {
+        gap: 9px;
+    }
+
+    .brand-lockup img {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
     }
 
     .user-chip {

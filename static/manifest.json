@@ -1,0 +1,25 @@
+{
+  "name": "Mente Alveare Aviator",
+  "short_name": "Aviator",
+  "description": "Gioco Aviator Mente Alveare",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#081018",
+  "theme_color": "#0f1923",
+  "icons": [
+    {
+      "src": "/static/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/img/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
