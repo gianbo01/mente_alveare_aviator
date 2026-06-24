@@ -1,7 +1,6 @@
-from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager, UserMixin, current_user, login_required, login_user, logout_user
 from flask_socketio import SocketIO, emit
-from mutagen.mp3 import MP3
 from werkzeug.security import check_password_hash, generate_password_hash
 from db import create_user, get_balance, get_user_by_id, get_user_by_username, init_db, update_balance
 import os
@@ -23,23 +22,15 @@ round_history = []
 connected_players = {}
 active_bets = {}
 queued_bets = {}
-radio_state = {
-    "playlist": [],
-    "current_index": 0,
-    "started_at": 0.0
-}
-radio_durations = {}
 players_lock = threading.Lock()
 active_bets_lock = threading.Lock()
 queued_bets_lock = threading.Lock()
-radio_lock = threading.Lock()
 TICK_SECONDS = 0.05
 MULTIPLIER_GROWTH = 1.012
 BETTING_SECONDS = 5
 POST_CRASH_SECONDS = 5
 MAX_ROUND_HISTORY = 20
-RADIO_DIR = "radio"
-RADIO_FALLBACK_DURATION = 240
+RADIO_BASE_URL = os.environ.get("RADIO_BASE_URL", "http://localhost:5001")
 
 
 class User(UserMixin):
@@ -56,105 +47,6 @@ def load_user(user_id):
         return None
 
     return User(user["id"], user["username"], user["balance"])
-
-
-def load_radio_playlist():
-    playlist = []
-    durations = {}
-
-    if os.path.isdir(RADIO_DIR):
-        playlist = [
-            filename
-            for filename in os.listdir(RADIO_DIR)
-            if filename.lower().endswith(".mp3") and os.path.isfile(os.path.join(RADIO_DIR, filename))
-        ]
-
-    random.shuffle(playlist)
-
-    for filename in playlist:
-        path = os.path.join(RADIO_DIR, filename)
-        try:
-            durations[filename] = float(MP3(path).info.length)
-        except Exception:
-            # Se la durata non è leggibile, usiamo una stima sicura per continuare la radio.
-            durations[filename] = RADIO_FALLBACK_DURATION
-
-    return playlist, durations
-
-
-def init_radio():
-    playlist, durations = load_radio_playlist()
-
-    with radio_lock:
-        radio_state["playlist"] = playlist
-        radio_state["current_index"] = 0
-        radio_state["started_at"] = time.time() if playlist else 0.0
-        radio_durations.clear()
-        radio_durations.update(durations)
-
-
-def get_radio_payload():
-    with radio_lock:
-        playlist = radio_state["playlist"]
-        if not playlist:
-            return {
-                "filename": None,
-                "started_at": 0.0,
-                "server_time": time.time(),
-                "index": 0,
-                "total": 0,
-                "duration": 0
-            }
-
-        current_index = radio_state["current_index"]
-        filename = playlist[current_index]
-        return {
-            "filename": filename,
-            "started_at": radio_state["started_at"],
-            "server_time": time.time(),
-            "index": current_index,
-            "total": len(playlist),
-            "duration": radio_durations.get(filename, RADIO_FALLBACK_DURATION)
-        }
-
-
-def advance_radio_track():
-    with radio_lock:
-        if not radio_state["playlist"]:
-            return None
-
-        next_index = radio_state["current_index"] + 1
-        needs_reload = next_index >= len(radio_state["playlist"])
-
-    playlist = []
-    durations = {}
-    if needs_reload:
-        # Rileggiamo fuori dal lock: leggere durate MP3 può richiedere tempo.
-        playlist, durations = load_radio_playlist()
-
-    with radio_lock:
-        if not radio_state["playlist"]:
-            return None
-
-        next_index = radio_state["current_index"] + 1
-
-        if next_index >= len(radio_state["playlist"]):
-            if playlist:
-                radio_state["playlist"] = playlist
-                radio_durations.clear()
-                radio_durations.update(durations)
-            else:
-                random.shuffle(radio_state["playlist"])
-
-            next_index = 0
-
-        radio_state["current_index"] = next_index
-        radio_state["started_at"] = time.time()
-
-    return get_radio_payload()
-
-
-init_radio()
 
 
 def generate_crash_point():
@@ -384,29 +276,10 @@ def game_loop():
         })
 
 
-def radio_loop():
-    while True:
-        time.sleep(1)
-
-        payload = get_radio_payload()
-        if not payload["filename"]:
-            continue
-
-        if time.time() - payload["started_at"] >= payload["duration"]:
-            next_payload = advance_radio_track()
-            if next_payload:
-                socketio.emit("radio_update", next_payload)
-
-
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html")
-
-
-@app.route("/radio/<path:filename>")
-def serve_radio(filename):
-    return send_from_directory(RADIO_DIR, filename)
+    return render_template("index.html", radio_base_url=RADIO_BASE_URL)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -548,17 +421,6 @@ def api_cashout():
     return jsonify({"ok": True, "balance": new_balance, "won": won})
 
 
-@app.route("/api/radio/skip", methods=["POST"])
-@login_required
-def api_radio_skip():
-    payload = advance_radio_track()
-    if not payload:
-        return jsonify({"ok": False, "error": "Nessun brano disponibile"}), 404
-
-    socketio.emit("radio_update", payload)
-    return jsonify({"ok": True, "radio": payload})
-
-
 @socketio.on("join")
 def handle_join():
     global current_round
@@ -568,12 +430,6 @@ def handle_join():
         emit_round_start()
 
     emit("round_state", get_round_state_payload())
-    emit("radio_state", get_radio_payload())
-
-
-@socketio.on("radio_request_state")
-def handle_radio_request_state():
-    emit("radio_state", get_radio_payload())
 
 
 @socketio.on("player_join")
@@ -642,6 +498,4 @@ def handle_disconnect():
 if __name__ == "__main__":
     t = threading.Thread(target=game_loop, daemon=True)
     t.start()
-    radio_thread = threading.Thread(target=radio_loop, daemon=True)
-    radio_thread.start()
     socketio.run(app, debug=True, host="0.0.0.0", port=5000, use_reloader=False, allow_unsafe_werkzeug=True)
